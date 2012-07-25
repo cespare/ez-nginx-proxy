@@ -1,4 +1,4 @@
 [
-  ["/foo/bar", "http://localhost:1234"],
-  ["/", "http://localhost:5678"]
+  ["/foo/bar", "localhost:1234"],
+  ["/", "localhost:5678"]
 ]

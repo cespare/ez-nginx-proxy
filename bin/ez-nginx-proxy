@@ -21,7 +21,7 @@ options = Trollop.options do
 
       [
         ["/foo/bar", "localhost:1234"], # Route requests to /foo/bar to a local server
-        ["/", "amazon.com"]           # / matches every request
+        ["/", "amazon.com"]             # / matches every request
       ]
 
     Usage:
@@ -75,6 +75,14 @@ unless match && match.size == 2
   abort "Unable to determine the nginx prefix root from the output of `#{nginx} -V`."
 end
 config_dir = File.dirname(match[1])
+
+routes.map! do |pattern, target|
+  if target =~ %r{://}
+    [pattern, target]
+  else
+    [pattern, "http://#{target}"]
+  end
+end
 
 routes.each do |pattern, target|
   puts "Proxying `#{pattern}` to #{target}".green
