@@ -38,7 +38,7 @@ Now install ez-nginx-proxy
 
     $ gem install ez-nginx-proxy
 
-## NOTE:
+## Note
 
 You will probably see this error when ez-nginx-proxy starts:
 
