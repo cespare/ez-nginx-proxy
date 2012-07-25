@@ -67,14 +67,14 @@ unless nginx
   EOS
 end
 
-# Locate the nginx configuration root
+# Locate the nginx configuration root. Since nginx v. 0.6.7, this is defined to be the directory that
+# nginx.conf lives in.
 config_output = `#{nginx} -V 2>&1`
-puts "\033[01;34m>>>> config_output: #{config_output.inspect}\e[m"
-match = config_output.match(/--prefix=([\S]+)/)
+match = config_output.match(/--conf-path=([\S]+)/)
 unless match && match.size == 2
   abort "Unable to determine the nginx prefix root from the output of `#{nginx} -V`."
 end
-prefix = match[1]
+config_dir = File.dirname(match[1])
 
 routes.each do |pattern, target|
   puts "Proxying `#{pattern}` to #{target}".green
@@ -88,8 +88,7 @@ template = ERB.new <<-EOS.dedent
   master_process off;
   worker_processes 1;
   error_log stderr warn;
-  pid <%= pid_file %>
-  ;
+  pid <%= pid_file %>;
 
   events {
     worker_connections 768;
@@ -103,7 +102,7 @@ template = ERB.new <<-EOS.dedent
     keepalive_timeout 65;
     types_hash_max_size 2048;
 
-    include <%= prefix %>/mime.types;
+    include <%= File.join(config_dir, "mime.types") %>;
 
     default_type application/octet-stream;
 
