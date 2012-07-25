@@ -1,0 +1,141 @@
+#!/usr/bin/env ruby
+
+# For developing the gem
+#$:.unshift(File.join(File.dirname(__FILE__), "../lib"))
+
+require "erb"
+require "securerandom"
+require "fileutils"
+
+require "trollop"
+require "dedent"
+require "colorize"
+
+require "ez-nginx-proxy/version"
+
+options = Trollop.options do
+  version EzNginxProxy::VERSION
+  banner <<-EOS.dedent
+    ez-nginx-proxy is a very simple reverse http proxy that can route requests based on pattern-matching the
+    URI. The configuration file is Ruby, and it must have the following form:
+
+      [
+        ["/foo/bar", "localhost:1234"], # Route requests to /foo/bar to a local server
+        ["/", "amazon.com"]           # / matches every request
+      ]
+
+    Usage:
+
+      $ ez-nginx-proxy [options] CONFIG_FILE
+
+    where [options] are:
+  EOS
+  opt :address, "Bind address", :default => "0.0.0.0"
+  opt :port, "Port", :default => 9876
+  opt :nginx_location, "Location of nginx", :default => `which nginx`
+  opt :version, "Show ez-nginx-proxy version"
+end
+
+Trollop.die "You must provide a configuration file" unless ARGV[0]
+Trollop.die "Invalid config file: #{ARGV[0]}" unless File.file? ARGV[0]
+begin
+  routes = eval(File.read(ARGV[0]))
+rescue
+  Trollop.die "Error reading or parsing the config file #{ARGV[0]}"
+end
+
+# Locate nginx
+nginx = nil
+([options[:nginx_location]] + %w(/usr/sbin/nginx /usr/local/sbin/nginx)).each do |guess_location|
+  if File.file? guess_location
+    nginx = guess_location
+    break
+  end
+end
+unless nginx
+  abort <<-EOS.dedent
+    Unable to locate nginx. Please install it using
+
+      $ sudo apt-get install nginx # Ubuntu
+
+    or
+
+      $ brew install nginx # Mac OS / homebrew
+
+    or similar. If nginx is installed to a nonstandard location, please pass that in with the --nginx-location
+    option.
+  EOS
+end
+
+# Locate the nginx configuration root
+config_output = `#{nginx} -V 2>&1`
+puts "\033[01;34m>>>> config_output: #{config_output.inspect}\e[m"
+match = config_output.match(/--prefix=([\S]+)/)
+unless match && match.size == 2
+  abort "Unable to determine the nginx prefix root from the output of `#{nginx} -V`."
+end
+prefix = match[1]
+
+routes.each do |pattern, target|
+  puts "Proxying `#{pattern}` to #{target}".green
+end
+
+template = ERB.new <<-EOS.dedent
+  # Template for nginx config
+  # Run in the foreground with no supervisor
+
+  daemon off;
+  master_process off;
+  worker_processes 1;
+  error_log stderr warn;
+  pid <%= pid_file %>
+  ;
+
+  events {
+    worker_connections 768;
+  }
+
+  http {
+    # Basic Settings copied from the default ubuntu nginx.conf
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+
+    include <%= prefix %>/mime.types;
+
+    default_type application/octet-stream;
+
+    # Write access logs. Obviously, this is slow.
+    access_log /dev/stdout;
+
+    gzip on;
+
+    proxy_temp_path <%= prefix_dir %>;
+    server {
+      listen <%= options[:port] %>;
+      server_name localhost;
+
+      <% routes.each do |pattern, target| %>
+        location <%= pattern %> {
+          proxy_pass <%= target %>;
+        }
+      <% end %>
+    }
+  }
+EOS
+
+prefix_dir = "/tmp/ez-nginx-#{SecureRandom.hex}/"
+FileUtils.mkdir(prefix_dir)
+pid_file = File.join(prefix_dir, "ez-nginx.pid")
+config_file = File.join(prefix_dir, "ez-nginx.conf")
+
+config_file_contents = template.result(binding)
+File.open(config_file, "w") { |f| f.write(config_file_contents) }
+
+pid = Process.spawn("#{nginx} -p #{prefix_dir} -c ez-nginx.conf")
+trap("SIGINT") { FileUtils.rm_rf(prefix_dir) }
+Process.wait(pid)
+# Clean up
+FileUtils.rm_rf(prefix_dir)
