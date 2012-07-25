@@ -20,8 +20,8 @@ options = Trollop.options do
     URI. The configuration file is Ruby, and it must have the following form:
 
       [
-        ["/foo/bar", "localhost:1234"], # Route requests to /foo/bar to a local server
-        ["/", "amazon.com"]           # / matches every request
+        ["/foo/bar", "http://localhost:1234"], # Route requests to /foo/bar to a local server
+        ["/", "http://amazon.com"]             # / matches every request
       ]
 
     Usage:

@@ -8,8 +8,8 @@ ez-nginx-proxy takes a very simple Ruby configuration file. Here is an example c
 
 ``` ruby
 [
-  ["/foo/bar", "localhost:1234"],
-  ["/", "amazon.com"]
+  ["/foo/bar", "http://localhost:1234"],
+  ["/", "http://amazon.com"]
 ]
 ```
 
