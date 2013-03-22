@@ -136,6 +136,7 @@ EOS
 
 prefix_dir = "/tmp/ez-nginx-#{SecureRandom.hex}/"
 FileUtils.mkdir(prefix_dir)
+FileUtils.mkdir("#{prefix_dir}/logs")
 pid_file = File.join(prefix_dir, "ez-nginx.pid")
 config_file = File.join(prefix_dir, "ez-nginx.conf")
 
