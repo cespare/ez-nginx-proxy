@@ -1,3 +1,5 @@
+**NOTE: I neither use nor maintain this project anymore.**
+
 # ez-nginx-proxy
 
 ez-nginx-proxy is a small wrapper around nginx. It requires nginx to already be installed. It is useful for
